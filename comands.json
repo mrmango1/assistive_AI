@@ -1,0 +1,5 @@
+{
+  "read_document": ["leer documento", "quiero que leas", "puedes leer esto"],
+  "describe_scene": ["describir escena", "qué ves", "descríbeme el lugar"],
+  "exit": ["salir", "terminar", "adiós"]
+}

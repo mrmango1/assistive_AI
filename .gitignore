@@ -1,0 +1,7 @@
+models/
+venv/
+__pycache__/
+command.wav
+output.wav
+image.jpg
+main
