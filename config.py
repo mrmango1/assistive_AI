@@ -2,11 +2,16 @@ import os
 from pathlib import Path
 
 # Configuración de API
-# "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"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Configuración de idioma
-LANGUAGE = "es"
+LANGUAGE = "spa"
+
+# Configuración de OCR
+USE_OPENAI_OCR = True
+
+# Configuración de TTS
+USE_OPENAI_TTS = True 
 
 # Configuración de modelos
 VOSK_MODEL_PATH = os.path.expanduser("./models/vosk-model-small-es-0.42")

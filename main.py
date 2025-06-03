@@ -12,7 +12,7 @@ from vision.camera import take_picture
 from vision.ocr import ocr_image
 from vision.describe import describe_image_openai
 from utils.internet import check_internet
-from config import TEMP_DIR
+from config import TEMP_DIR, USE_OPENAI_OCR, USE_OPENAI_TTS
 
 command_lock = threading.Lock()
 
@@ -85,8 +85,32 @@ def handle_command(action):
                     speak("No pude tomar la foto del documento.")
                     return
                 
-                if check_internet():
-                    speak("Procesando documento en línea.")
+                # Verificar conexión solo si se va a usar OpenAI
+                needs_internet = USE_OPENAI_OCR or USE_OPENAI_TTS
+                if needs_internet and not check_internet():
+                    speak("Sin conexión a internet. Usando procesamiento local.")
+                    # Temporalmente cambiar configuraciones si no hay internet
+                    import config
+                    original_ocr = config.USE_OPENAI_OCR
+                    original_tts = config.USE_OPENAI_TTS
+                    
+                    config.USE_OPENAI_OCR = False
+                    config.USE_OPENAI_TTS = False
+                    
+                    try:
+                        text = ocr_image(filename)
+                    finally:
+                        config.USE_OPENAI_OCR = original_ocr
+                        config.USE_OPENAI_TTS = original_tts
+                    
+                    if text and text.strip():
+                        speak(f"El documento dice: {text}")
+                    else:
+                        speak("No pude leer texto en el documento.")
+                    return
+                
+                if USE_OPENAI_OCR:
+                    speak("Procesando documento con inteligencia artificial.")
                 else:
                     speak("Procesando documento sin conexión.")
                 
@@ -139,6 +163,10 @@ def main():
     """Función principal del asistente"""
     try:
         print("Iniciando asistente de voz...")
+        
+        # Mostrar configuración actual
+        print(f"Configuración - OCR: {'OpenAI' if USE_OPENAI_OCR else 'Tesseract'}")
+        print(f"Configuración - TTS: {'OpenAI' if USE_OPENAI_TTS else 'Sistema/Coqui'}")
         
         # Cargar comandos
         known_commands = load_commands_from_file()
