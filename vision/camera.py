@@ -1,4 +1,3 @@
-import cv2
 import platform
 import time
 import sys
@@ -15,6 +14,26 @@ except ImportError:
     DEFAULT_IMAGE_FILENAME = Path.cwd().parent / "temp" / "captured_image.jpg"
     DEFAULT_IMAGE_FILENAME.parent.mkdir(exist_ok=True)
 
+# Importar librerías según disponibilidad
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    print("OpenCV no disponible")
+
+try:
+    from picamera2 import Picamera2
+    PICAMERA2_AVAILABLE = True
+except ImportError:
+    PICAMERA2_AVAILABLE = False
+
+try:
+    import picamera
+    PICAMERA_AVAILABLE = True
+except ImportError:
+    PICAMERA_AVAILABLE = False
+
 def take_picture(filename=None):
     """Toma una foto usando la cámara disponible según el sistema operativo"""
     if filename is None:
@@ -24,27 +43,161 @@ def take_picture(filename=None):
     system = platform.system()
     
     try:
-        if system == "Darwin":  # macOS
-            return _take_picture_opencv_fast(filename)
-        elif system == "Linux":
-            # Intentar primero con PiCamera si está disponible
-            try:
-                return _take_picture_picamera(filename)
-            except ImportError:
-                print("PiCamera no disponible, usando OpenCV...")
-                return _take_picture_opencv_fast(filename)
-        else:
+        if system == "Linux":  # Raspberry Pi
+            # Prioridad: PiCamera2 > PiCamera > OpenCV
+            if PICAMERA2_AVAILABLE:
+                print("Usando PiCamera2...")
+                return _take_picture_picamera2(filename)
+            elif PICAMERA_AVAILABLE:
+                print("Usando PiCamera legacy...")
+                return _take_picture_picamera_legacy(filename)
+            elif CV2_AVAILABLE:
+                print("Usando OpenCV con configuración para RPi...")
+                return _take_picture_opencv_rpi(filename)
+            else:
+                print("Error: No hay librerías de cámara disponibles")
+                return None
+        else:  # macOS, Windows
             return _take_picture_opencv_fast(filename)
             
     except Exception as e:
         print(f"Error tomando foto: {e}")
         return None
 
+def _take_picture_opencv_rpi(filename):
+    """OpenCV específicamente configurado para Raspberry Pi"""
+    if not CV2_AVAILABLE:
+        return None
+        
+    print("Accediendo a la cámara con OpenCV...")
+    
+    # Configuración específica para Raspberry Pi
+    cam = cv2.VideoCapture(0, cv2.CAP_V4L2)
+    
+    if not cam.isOpened():
+        print("Error: No se pudo acceder a la cámara")
+        return None
+    
+    try:
+        # Configuración optimizada para RPi
+        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)   # Resolución más baja
+        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cam.set(cv2.CAP_PROP_FPS, 15)            # FPS más bajo
+        cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)      # Buffer mínimo
+        
+        # Configuraciones adicionales para V4L2
+        cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+        
+        print("Esperando inicialización de cámara...")
+        time.sleep(3)  # Más tiempo de espera para RPi
+        
+        # Descartar frames iniciales
+        for i in range(10):
+            ret, frame = cam.read()
+            if ret:
+                print(f"Frame {i+1} capturado correctamente")
+            else:
+                print(f"Frame {i+1} falló")
+            time.sleep(0.1)
+        
+        # Capturar frame final
+        print("Capturando imagen final...")
+        for attempt in range(5):
+            ret, frame = cam.read()
+            if ret and frame is not None:
+                # Crear directorio si no existe
+                filename.parent.mkdir(parents=True, exist_ok=True)
+                
+                success = cv2.imwrite(str(filename), frame)
+                if success:
+                    print(f"✅ Foto guardada: {filename}")
+                    return str(filename)
+                else:
+                    print("Error guardando imagen")
+            else:
+                print(f"Intento {attempt+1} falló, reintentando...")
+                time.sleep(0.5)
+        
+        print("❌ No se pudo capturar ningún frame válido")
+        return None
+            
+    except Exception as e:
+        print(f"Error en _take_picture_opencv_rpi: {e}")
+        return None
+    finally:
+        cam.release()
+
+def _take_picture_picamera2(filename):
+    """Toma foto usando PiCamera2"""
+    if not PICAMERA2_AVAILABLE:
+        return None
+        
+    try:
+        print("Inicializando PiCamera2...")
+        picam2 = Picamera2()
+        
+        # Configuración para foto
+        config = picam2.create_still_configuration(
+            main={"size": (1920, 1080)},
+            lores={"size": (640, 480)},
+            display="lores"
+        )
+        picam2.configure(config)
+        
+        print("Iniciando cámara...")
+        picam2.start()
+        
+        # Esperar estabilización
+        time.sleep(2)
+        
+        # Capturar imagen
+        print("Capturando imagen...")
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        picam2.capture_file(str(filename))
+        
+        # Detener cámara
+        picam2.stop()
+        
+        print(f"✅ Foto guardada con PiCamera2: {filename}")
+        return str(filename)
+        
+    except Exception as e:
+        print(f"Error con PiCamera2: {e}")
+        return None
+
+def _take_picture_picamera_legacy(filename):
+    """Toma foto usando PiCamera legacy"""
+    if not PICAMERA_AVAILABLE:
+        return None
+        
+    try:
+        print("Inicializando PiCamera legacy...")
+        with picamera.PiCamera() as camera:
+            # Configuración básica
+            camera.resolution = (1920, 1080)
+            camera.start_preview()
+            
+            # Esperar estabilización
+            time.sleep(2)
+            
+            # Capturar imagen
+            filename.parent.mkdir(parents=True, exist_ok=True)
+            camera.capture(str(filename))
+            
+        print(f"✅ Foto guardada con PiCamera legacy: {filename}")
+        return str(filename)
+        
+    except Exception as e:
+        print(f"Error con PiCamera legacy: {e}")
+        return None
+
 def _take_picture_opencv_fast(filename):
-    """Versión optimizada y rápida para tomar fotos"""
+    """Versión para macOS/Windows"""
+    if not CV2_AVAILABLE:
+        return None
+        
     print("Accediendo a la cámara...")
     
-    # Usar AVFoundation en macOS para mejor rendimiento
     backend = cv2.CAP_AVFOUNDATION if platform.system() == "Darwin" else cv2.CAP_ANY
     cam = cv2.VideoCapture(0, backend)
     
@@ -53,54 +206,31 @@ def _take_picture_opencv_fast(filename):
         return None
     
     try:
-        # Configuración rápida y eficiente
         cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1024)
         cam.set(cv2.CAP_PROP_FPS, 30)
-        cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Buffer mínimo para menor latencia
+        cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         
-        # Solo para macOS: habilitar auto-exposición rápida
         if platform.system() == "Darwin":
             cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
         
-        # Tiempo mínimo de inicialización (1 segundo)
         time.sleep(1)
         
-        # Descartar solo 3 frames iniciales para ahorrar tiempo
         for _ in range(3):
             ret, frame = cam.read()
             if not ret:
                 break
         
-        # Tomar la foto final
         ret, frame = cam.read()
         
         if ret and frame is not None:
-            brightness = frame.mean()
-            
-            # Solo si la imagen está MUY oscura, intentar una más
-            if brightness < 10:
-                print("Imagen muy oscura, reintentando...")
-                time.sleep(0.5)
-                ret, frame = cam.read()
-            
-            if ret and frame is not None:
-                # Crear directorio si no existe
-                filename.parent.mkdir(parents=True, exist_ok=True)
-                
-                success = cv2.imwrite(str(filename), frame)
-                if success:
-                    print(f"Foto guardada: {filename} (brightness: {brightness:.1f})")
-                    return str(filename)
-                else:
-                    print("Error: No se pudo guardar la imagen")
-                    return None
-            else:
-                print("Error: No se pudo capturar frame válido")
-                return None
-        else:
-            print("Error: No se pudo capturar la imagen")
-            return None
+            filename.parent.mkdir(parents=True, exist_ok=True)
+            success = cv2.imwrite(str(filename), frame)
+            if success:
+                print(f"✅ Foto guardada: {filename}")
+                return str(filename)
+        
+        return None
             
     except Exception as e:
         print(f"Error en _take_picture_opencv_fast: {e}")
@@ -108,69 +238,59 @@ def _take_picture_opencv_fast(filename):
     finally:
         cam.release()
 
-def _take_picture_picamera(filename):
-    """Toma foto usando PiCamera2 - versión rápida"""
-    try:
-        from picamera2 import Picamera2
-        
-        picam2 = Picamera2()
-        # Configuración básica y rápida
-        config = picam2.create_still_configuration()
-        picam2.configure(config)
-        
-        picam2.start()
-        # Tiempo reducido de espera
-        time.sleep(1)
-        
-        picam2.capture_file(str(filename))
-        picam2.stop()
-        print(f"Foto guardada en: {filename}")
-        return str(filename)
-        
-    except Exception as e:
-        print(f"Error en _take_picture_picamera: {e}")
-        return None
-
 def test_camera_fast():
     """Prueba rápida de cámara"""
-    print("=== PRUEBA RÁPIDA DE CÁMARA ===")
+    print("=== PRUEBA DE CÁMARAS DISPONIBLES ===")
+    print(f"OpenCV disponible: {CV2_AVAILABLE}")
+    print(f"PiCamera2 disponible: {PICAMERA2_AVAILABLE}")
+    print(f"PiCamera legacy disponible: {PICAMERA_AVAILABLE}")
     
-    backend = cv2.CAP_AVFOUNDATION if platform.system() == "Darwin" else cv2.CAP_ANY
-    cam = cv2.VideoCapture(0, backend)
+    system = platform.system()
+    print(f"Sistema: {system}")
     
-    if not cam.isOpened():
-        print("❌ No se puede acceder a la cámara")
-        return False
+    if system == "Linux":
+        # Probar PiCamera2 primero
+        if PICAMERA2_AVAILABLE:
+            try:
+                print("\nProbando PiCamera2...")
+                picam2 = Picamera2()
+                info = picam2.camera_properties
+                print(f"✅ PiCamera2 funcional: {info}")
+                return True
+            except Exception as e:
+                print(f"❌ Error con PiCamera2: {e}")
+        
+        # Probar PiCamera legacy
+        if PICAMERA_AVAILABLE:
+            try:
+                print("\nProbando PiCamera legacy...")
+                with picamera.PiCamera() as camera:
+                    print("✅ PiCamera legacy funcional")
+                    return True
+            except Exception as e:
+                print(f"❌ Error con PiCamera legacy: {e}")
     
-    print("✅ Cámara accesible")
+    # Probar OpenCV como último recurso
+    if CV2_AVAILABLE:
+        print(f"\nProbando OpenCV...")
+        backend = cv2.CAP_V4L2 if system == "Linux" else cv2.CAP_ANY
+        cam = cv2.VideoCapture(0, backend)
+        
+        if cam.isOpened():
+            print("✅ OpenCV puede acceder a la cámara")
+            cam.release()
+            return True
+        else:
+            print("❌ OpenCV no puede acceder a la cámara")
+            cam.release()
     
-    # Mostrar propiedades básicas
-    width = cam.get(cv2.CAP_PROP_FRAME_WIDTH)
-    height = cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
-    print(f"Resolución: {width}x{height}")
-    
-    # Prueba rápida de captura
-    time.sleep(0.5)
-    ret, frame = cam.read()
-    
-    if ret and frame is not None:
-        brightness = frame.mean()
-        print(f"✅ Captura exitosa (brightness: {brightness:.1f})")
-        success = True
-    else:
-        print("❌ No se pudo capturar frame")
-        success = False
-    
-    cam.release()
-    return success
+    return False
 
 if __name__ == "__main__":
-    print("🎥 PRUEBA RÁPIDA DE CÁMARA 🎥\n")
+    print("🎥 PRUEBA DE CÁMARA RASPBERRY PI 🎥\n")
     
-    # Prueba rápida
     start_time = time.time()
     if test_camera_fast():
-        # Tomar foto de prueba
         print("\n=== TOMANDO FOTO DE PRUEBA ===")
         result = take_picture("test_photo.jpg")
         
@@ -181,6 +301,8 @@ if __name__ == "__main__":
                 print(f"Tamaño: {size} bytes")
         else:
             print("❌ Error tomando foto")
+    else:
+        print("❌ No se encontraron cámaras funcionales")
     
     total_time = time.time() - start_time
-    print(f"\n⏱️  Tiempo total: {total_time:.2f} segundos")
+    print(f"\n⏱️ Tiempo total: {total_time:.2f} segundos")
