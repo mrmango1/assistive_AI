@@ -17,7 +17,7 @@ from config import TEMP_DIR, USE_OPENAI_OCR, USE_OPENAI_TTS
 command_lock = threading.Lock()
 
 def get_best_command_match(text, command_aliases, cutoff=0.6):
-    """Encuentra la mejor coincidencia de comando usando fuzzy matching"""
+    """Encuentra la mejor coincidencia de comando usando búsqueda difusa"""
     if not text or not command_aliases:
         return None
         
@@ -73,7 +73,7 @@ def cleanup_temp_file(filename):
             print(f"No se pudo eliminar archivo temporal {filename}: {e}")
 
 def handle_command(action):
-    """Maneja la ejecución de comandos con lock para evitar concurrencia"""
+    """Maneja la ejecución de comandos con bloqueo para evitar concurrencia"""
     filename = None
     try:
         with command_lock:
@@ -192,7 +192,7 @@ def main():
             return
 
         def listen_loop():
-            """Loop principal de escucha de comandos"""
+            """Bucle principal de escucha de comandos"""
             # Ahora sí está realmente listo
             speak("Asistente listo. Di un comando para comenzar.")
             
@@ -231,7 +231,7 @@ def main():
         listen_thread.start()
 
         try:
-            # Mantener el programa vivo
+            # Mantener el programa ejecutándose
             while listen_thread.is_alive():
                 listen_thread.join(timeout=1)
         except KeyboardInterrupt:

@@ -1,50 +1,50 @@
 #!/usr/bin/env python3
 """
-Simple validation script for the Assistive AI application
-Tests core functionality without heavy dependencies
+Script de validación simple para la aplicación de IA Asistiva
+Prueba la funcionalidad principal sin dependencias pesadas
 """
 import sys
 import os
 
 def test_config():
-    """Test configuration loading"""
+    """Probar carga de configuración"""
     try:
         import config
-        print("✅ Config loaded successfully")
-        print(f"   - OpenAI OCR: {config.USE_OPENAI_OCR}")
-        print(f"   - OpenAI TTS: {config.USE_OPENAI_TTS}")
-        print(f"   - TTS Voice: {config.OPENAI_TTS_VOICE}")
-        print(f"   - API Key set: {'Yes' if config.OPENAI_API_KEY else 'No (set OPENAI_API_KEY env var)'}")
+        print("✅ Configuración cargada exitosamente")
+        print(f"   - OCR OpenAI: {config.USE_OPENAI_OCR}")
+        print(f"   - TTS OpenAI: {config.USE_OPENAI_TTS}")
+        print(f"   - Voz TTS: {config.OPENAI_TTS_VOICE}")
+        print(f"   - Clave API configurada: {'Sí' if config.OPENAI_API_KEY else 'No (configura variable OPENAI_API_KEY)'}")
         return True
     except Exception as e:
-        print(f"❌ Config test failed: {e}")
+        print(f"❌ Prueba de configuración falló: {e}")
         return False
 
 def test_commands():
-    """Test commands loading"""
+    """Probar carga de comandos"""
     try:
         import json
         if os.path.exists('commands.json'):
             with open('commands.json', 'r', encoding='utf-8') as f:
                 commands = json.load(f)
-            print("✅ Commands loaded successfully")
-            print(f"   - Available commands: {list(commands.keys())}")
+            print("✅ Comandos cargados exitosamente")
+            print(f"   - Comandos disponibles: {list(commands.keys())}")
             return True
         else:
-            print("❌ commands.json not found")
+            print("❌ commands.json no encontrado")
             return False
     except Exception as e:
-        print(f"❌ Commands test failed: {e}")
+        print(f"❌ Prueba de comandos falló: {e}")
         return False
 
 def test_imports():
-    """Test critical imports"""
+    """Probar importaciones críticas"""
     modules = [
-        ('requests', 'HTTP requests'),
-        ('json', 'JSON handling'),
-        ('threading', 'Threading support'),
-        ('pathlib', 'Path handling'),
-        ('difflib', 'Fuzzy matching'),
+        ('requests', 'Peticiones HTTP'),
+        ('json', 'Manejo de JSON'),
+        ('threading', 'Soporte de hilos'),
+        ('pathlib', 'Manejo de rutas'),
+        ('difflib', 'Coincidencias difusas'),
     ]
     
     all_good = True
@@ -59,69 +59,69 @@ def test_imports():
     return all_good
 
 def test_openai_integration():
-    """Test OpenAI integration (without making API calls)"""
+    """Probar integración con OpenAI (sin hacer llamadas a la API)"""
     try:
         import openai
-        print("✅ OpenAI SDK available")
+        print("✅ SDK de OpenAI disponible")
         
         import config
         if config.OPENAI_API_KEY and config.OPENAI_API_KEY != "your_openai_api_key_here":
-            print("✅ OpenAI API key is configured")
+            print("✅ Clave API de OpenAI está configurada")
         else:
-            print("⚠️  OpenAI API key not set - OpenAI features will be disabled")
+            print("⚠️  Clave API de OpenAI no configurada - funciones de OpenAI estarán deshabilitadas")
         
         return True
     except ImportError:
-        print("❌ OpenAI SDK not installed")
+        print("❌ SDK de OpenAI no instalado")
         return False
 
 def test_directories():
-    """Test required directories"""
+    """Probar directorios requeridos"""
     directories = ['temp', 'audio', 'vision', 'utils']
     all_good = True
     
     for directory in directories:
         if os.path.exists(directory):
-            print(f"✅ {directory}/ directory exists")
+            print(f"✅ directorio {directory}/ existe")
         else:
-            print(f"❌ {directory}/ directory missing")
+            print(f"❌ directorio {directory}/ faltante")
             all_good = False
     
     return all_good
 
 def main():
-    """Run all tests"""
-    print("🔍 Validating Assistive AI Voice Application Setup")
+    """Ejecutar todas las pruebas"""
+    print("🔍 Validando Configuración de la Aplicación de Voz Asistiva con IA")
     print("=" * 50)
     
     tests = [
-        ("Configuration", test_config),
-        ("Commands", test_commands),
-        ("Core Imports", test_imports),
-        ("OpenAI Integration", test_openai_integration),
-        ("Directory Structure", test_directories),
+        ("Configuración", test_config),
+        ("Comandos", test_commands),
+        ("Importaciones Principales", test_imports),
+        ("Integración OpenAI", test_openai_integration),
+        ("Estructura de Directorios", test_directories),
     ]
     
     passed = 0
     total = len(tests)
     
     for test_name, test_func in tests:
-        print(f"\n📋 Testing {test_name}:")
+        print(f"\n📋 Probando {test_name}:")
         if test_func():
             passed += 1
         else:
-            print(f"   ⚠️  {test_name} test had issues")
+            print(f"   ⚠️  Prueba de {test_name} tuvo problemas")
     
     print("\n" + "=" * 50)
-    print(f"🎯 Test Results: {passed}/{total} passed")
+    print(f"🎯 Resultados de Pruebas: {passed}/{total} pasaron")
     
     if passed == total:
-        print("🎉 All tests passed! The application should work correctly.")
-        print("\n📌 Next steps:")
-        print("   1. Set OPENAI_API_KEY environment variable or create .env file")
-        print("   2. Run: python main.py")
+        print("🎉 ¡Todas las pruebas pasaron! La aplicación debería funcionar correctamente.")
+        print("\n📌 Próximos pasos:")
+        print("   1. Configura la variable de entorno OPENAI_API_KEY o crea archivo .env")
+        print("   2. Ejecuta: python main.py")
     else:
-        print("⚠️  Some tests failed. Please review the issues above.")
+        print("⚠️  Algunas pruebas fallaron. Por favor revisa los problemas anteriores.")
     
     return passed == total
 

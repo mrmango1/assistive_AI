@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file if it exists
+# Cargar variables de entorno desde archivo .env si existe
 load_dotenv()
 
 # Configuración de API
@@ -35,6 +35,6 @@ DEFAULT_IMAGE_FILENAME = TEMP_DIR / "captured_image.jpg"
 SAMPLE_RATE = 16000
 BLOCK_SIZE = 8000
 
-# Timeouts
+# Tiempos de espera
 INTERNET_CHECK_TIMEOUT = 3
 API_REQUEST_TIMEOUT = 30

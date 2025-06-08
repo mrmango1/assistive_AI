@@ -1,41 +1,41 @@
 #!/bin/bash
 
-# Setup script for Assistive AI Voice Application
-echo "🤖 Setting up Assistive AI Voice Application..."
+# Script de configuración para la Aplicación de Voz Asistiva con IA
+echo "🤖 Configurando Aplicación de Voz Asistiva con IA..."
 
-# Check if Python 3 is installed
+# Verificar si Python 3 está instalado
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is required but not installed. Please install Python 3.8+ first."
+    echo "❌ Python 3 es requerido pero no está instalado. Por favor instala Python 3.8+ primero."
     exit 1
 fi
 
-echo "✅ Python 3 found: $(python3 --version)"
+echo "✅ Python 3 encontrado: $(python3 --version)"
 
-# Create virtual environment if it doesn't exist
+# Crear entorno virtual si no existe
 if [ ! -d "venv" ]; then
-    echo "🔧 Creating virtual environment..."
+    echo "🔧 Creando entorno virtual..."
     python3 -m venv venv
 fi
 
-# Activate virtual environment
-echo "🔧 Activating virtual environment..."
+# Activar entorno virtual
+echo "🔧 Activando entorno virtual..."
 source venv/bin/activate
 
-# Upgrade pip
-echo "🔧 Upgrading pip..."
+# Actualizar pip
+echo "🔧 Actualizando pip..."
 pip install --upgrade pip
 
-# Install requirements
-echo "📦 Installing Python dependencies..."
+# Instalar dependencias
+echo "📦 Instalando dependencias de Python..."
 pip install -r requirements.txt
 
-# Create temp directory
-echo "📁 Creating temp directory..."
+# Crear directorio temporal
+echo "📁 Creando directorio temporal..."
 mkdir -p temp
 
-# Create commands.json if it doesn't exist
+# Crear commands.json si no existe
 if [ ! -f "commands.json" ]; then
-    echo "📝 Creating default commands.json..."
+    echo "📝 Creando commands.json predeterminado..."
     cat > commands.json << 'EOF'
 {
     "read_document": [
@@ -65,18 +65,18 @@ if [ ! -f "commands.json" ]; then
 EOF
 fi
 
-# Check for system dependencies
-echo "🔍 Checking system dependencies..."
+# Verificar dependencias del sistema
+echo "🔍 Verificando dependencias del sistema..."
 
-# Check for Tesseract OCR
+# Verificar Tesseract OCR
 if ! command -v tesseract &> /dev/null; then
-    echo "⚠️  Tesseract OCR not found. Installing..."
+    echo "⚠️  Tesseract OCR no encontrado. Instalando..."
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS
         if command -v brew &> /dev/null; then
             brew install tesseract tesseract-lang-spa
         else
-            echo "❌ Homebrew not found. Please install Tesseract manually or install Homebrew first."
+            echo "❌ Homebrew no encontrado. Por favor instala Tesseract manualmente o instala Homebrew primero."
         fi
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         # Linux
@@ -84,62 +84,62 @@ if ! command -v tesseract &> /dev/null; then
         sudo apt-get install -y tesseract-ocr tesseract-ocr-spa
     fi
 else
-    echo "✅ Tesseract OCR found"
+    echo "✅ Tesseract OCR encontrado"
 fi
 
-# Check for audio tools
+# Verificar herramientas de audio
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Check for espeak (Linux TTS)
+    # Verificar espeak (TTS de Linux)
     if ! command -v espeak &> /dev/null; then
-        echo "⚠️  espeak not found. Installing..."
+        echo "⚠️  espeak no encontrado. Instalando..."
         sudo apt-get install -y espeak
     else
-        echo "✅ espeak found"
+        echo "✅ espeak encontrado"
     fi
     
-    # Check for aplay (Linux audio player)
+    # Verificar aplay (reproductor de audio de Linux)
     if ! command -v aplay &> /dev/null; then
-        echo "⚠️  aplay not found. Installing ALSA utils..."
+        echo "⚠️  aplay no encontrado. Instalando utilidades ALSA..."
         sudo apt-get install -y alsa-utils
     else
-        echo "✅ aplay found"
+        echo "✅ aplay encontrado"
     fi
     
-    # Optional: mpg123 for MP3 playback (OpenAI TTS)
+    # Opcional: mpg123 para reproducción MP3 (OpenAI TTS)
     if ! command -v mpg123 &> /dev/null; then
-        echo "⚠️  mpg123 not found. Installing for OpenAI TTS support..."
+        echo "⚠️  mpg123 no encontrado. Instalando para soporte de OpenAI TTS..."
         sudo apt-get install -y mpg123
     else
-        echo "✅ mpg123 found"
+        echo "✅ mpg123 encontrado"
     fi
 fi
 
-# Create .env.example file
+# Crear archivo .env.example
 if [ ! -f ".env.example" ]; then
-    echo "📝 Creating .env.example file..."
+    echo "📝 Creando archivo .env.example..."
     cat > .env.example << 'EOF'
-# OpenAI API Key for enhanced features
+# Clave API de OpenAI para funciones mejoradas
 OPENAI_API_KEY=your_openai_api_key_here
 
-# Configure which tools to use
+# Configurar qué herramientas usar
 USE_OPENAI_OCR=true
 USE_OPENAI_TTS=true
 
-# OpenAI TTS Voice (alloy, echo, fable, onyx, nova, shimmer)
+# Voz de OpenAI TTS (alloy, echo, fable, onyx, nova, shimmer)
 OPENAI_TTS_VOICE=alloy
 EOF
 fi
 
 echo ""
-echo "🎉 Setup complete!"
+echo "🎉 ¡Configuración completa!"
 echo ""
-echo "📋 Next steps:"
-echo "1. Copy .env.example to .env and add your OpenAI API key (optional but recommended)"
-echo "2. Run the application with: python3 main.py"
+echo "📋 Próximos pasos:"
+echo "1. Copia .env.example a .env y agrega tu clave API de OpenAI (opcional pero recomendado)"
+echo "2. Ejecuta la aplicación con: python3 main.py"
 echo ""
-echo "ℹ️  Configuration:"
-echo "   - Edit config.py to change OCR/TTS preferences"
-echo "   - Edit commands.json to add custom voice commands"
-echo "   - Check README.md for detailed usage instructions"
+echo "ℹ️  Configuración:"
+echo "   - Edita config.py para cambiar preferencias de OCR/TTS"
+echo "   - Edita commands.json para agregar comandos de voz personalizados"
+echo "   - Revisa README.md para instrucciones detalladas de uso"
 echo ""
-echo "🚀 Ready to run: python3 main.py"
+echo "🚀 Listo para ejecutar: python3 main.py"
