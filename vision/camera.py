@@ -2,6 +2,7 @@ import platform
 import time
 import sys
 import os
+import subprocess
 from pathlib import Path
 
 # Agregar el directorio padre al path para poder importar config
@@ -44,16 +45,18 @@ def take_picture(filename=None):
     
     try:
         if system == "Linux":  # Raspberry Pi
-            # Prioridad: PiCamera2 > PiCamera > OpenCV
-            if PICAMERA2_AVAILABLE:
+            # Prioridad: Comandos del sistema > PiCamera2 > PiCamera > OpenCV
+            if _take_picture_system_command(filename):
+                return str(filename)
+            elif PICAMERA2_AVAILABLE:
                 print("Usando PiCamera2...")
                 return _take_picture_picamera2(filename)
             elif PICAMERA_AVAILABLE:
                 print("Usando PiCamera legacy...")
                 return _take_picture_picamera_legacy(filename)
             elif CV2_AVAILABLE:
-                print("Usando OpenCV con configuración para RPi...")
-                return _take_picture_opencv_rpi(filename)
+                print("Usando OpenCV con configuración alternativa...")
+                return _take_picture_opencv_alternative(filename)
             else:
                 print("Error: No hay librerías de cámara disponibles")
                 return None
@@ -64,68 +67,96 @@ def take_picture(filename=None):
         print(f"Error tomando foto: {e}")
         return None
 
-def _take_picture_opencv_rpi(filename):
-    """OpenCV específicamente configurado para Raspberry Pi"""
+def _take_picture_system_command(filename):
+    """Usar comandos del sistema para tomar foto (más confiable en RPi)"""
+    filename = Path(filename)
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    
+    commands_to_try = [
+        # libcamera (Raspberry Pi OS Bullseye+)
+        ["libcamera-still", "-o", str(filename), "-t", "1000", "--width", "1920", "--height", "1080"],
+        # raspistill (Raspberry Pi OS legacy)
+        ["raspistill", "-o", str(filename), "-t", "1000", "-w", "1920", "-h", "1080"],
+        # fswebcam (USB cameras)
+        ["fswebcam", "-r", "1280x720", "--no-banner", str(filename)],
+        # uvccapture (USB cameras alternative)
+        ["uvccapture", "-o", str(filename), "-x", "1280", "-y", "720"]
+    ]
+    
+    for cmd in commands_to_try:
+        try:
+            print(f"Intentando comando: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0 and filename.exists() and filename.stat().st_size > 0:
+                print(f"✅ Foto capturada con {cmd[0]}: {filename}")
+                return True
+            else:
+                print(f"❌ {cmd[0]} falló: {result.stderr}")
+                
+        except subprocess.TimeoutExpired:
+            print(f"❌ {cmd[0]} timeout")
+        except FileNotFoundError:
+            print(f"❌ {cmd[0]} no disponible")
+        except Exception as e:
+            print(f"❌ Error con {cmd[0]}: {e}")
+    
+    return False
+
+def _take_picture_opencv_alternative(filename):
+    """Configuración alternativa de OpenCV para RPi"""
     if not CV2_AVAILABLE:
         return None
         
-    print("Accediendo a la cámara con OpenCV...")
+    print("Probando configuración alternativa de OpenCV...")
     
-    # Configuración específica para Raspberry Pi
-    cam = cv2.VideoCapture(0, cv2.CAP_V4L2)
+    # Diferentes backends para probar
+    backends = [
+        cv2.CAP_V4L2,
+        cv2.CAP_V4L,
+        cv2.CAP_GSTREAMER,
+        cv2.CAP_ANY
+    ]
     
-    if not cam.isOpened():
-        print("Error: No se pudo acceder a la cámara")
-        return None
-    
-    try:
-        # Configuración optimizada para RPi
-        cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)   # Resolución más baja
-        cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        cam.set(cv2.CAP_PROP_FPS, 15)            # FPS más bajo
-        cam.set(cv2.CAP_PROP_BUFFERSIZE, 1)      # Buffer mínimo
+    for backend in backends:
+        print(f"Probando backend: {backend}")
+        cam = cv2.VideoCapture(0, backend)
         
-        # Configuraciones adicionales para V4L2
-        cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+        if not cam.isOpened():
+            print(f"Backend {backend} no disponible")
+            continue
         
-        print("Esperando inicialización de cámara...")
-        time.sleep(3)  # Más tiempo de espera para RPi
-        
-        # Descartar frames iniciales
-        for i in range(10):
-            ret, frame = cam.read()
-            if ret:
-                print(f"Frame {i+1} capturado correctamente")
-            else:
-                print(f"Frame {i+1} falló")
-            time.sleep(0.1)
-        
-        # Capturar frame final
-        print("Capturando imagen final...")
-        for attempt in range(5):
-            ret, frame = cam.read()
-            if ret and frame is not None:
-                # Crear directorio si no existe
-                filename.parent.mkdir(parents=True, exist_ok=True)
-                
-                success = cv2.imwrite(str(filename), frame)
-                if success:
-                    print(f"✅ Foto guardada: {filename}")
-                    return str(filename)
-                else:
-                    print("Error guardando imagen")
-            else:
-                print(f"Intento {attempt+1} falló, reintentando...")
-                time.sleep(0.5)
-        
-        print("❌ No se pudo capturar ningún frame válido")
-        return None
+        try:
+            # Configuraciones más básicas
+            cam.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+            cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+            cam.set(cv2.CAP_PROP_FPS, 10)
             
-    except Exception as e:
-        print(f"Error en _take_picture_opencv_rpi: {e}")
-        return None
-    finally:
-        cam.release()
+            # Esperar más tiempo
+            time.sleep(5)
+            
+            # Intentar capturar con timeout manual
+            print("Intentando captura...")
+            for attempt in range(20):  # Más intentos
+                ret, frame = cam.read()
+                if ret and frame is not None:
+                    filename.parent.mkdir(parents=True, exist_ok=True)
+                    success = cv2.imwrite(str(filename), frame)
+                    if success:
+                        print(f"✅ Foto guardada con OpenCV backend {backend}: {filename}")
+                        cam.release()
+                        return str(filename)
+                
+                time.sleep(0.2)  # Pausa entre intentos
+            
+            print(f"Backend {backend} no pudo capturar frames")
+            
+        except Exception as e:
+            print(f"Error con backend {backend}: {e}")
+        finally:
+            cam.release()
+    
+    return None
 
 def _take_picture_picamera2(filename):
     """Toma foto usando PiCamera2"""
@@ -136,19 +167,15 @@ def _take_picture_picamera2(filename):
         print("Inicializando PiCamera2...")
         picam2 = Picamera2()
         
-        # Configuración para foto
-        config = picam2.create_still_configuration(
-            main={"size": (1920, 1080)},
-            lores={"size": (640, 480)},
-            display="lores"
-        )
+        # Configuración más simple
+        config = picam2.create_still_configuration()
         picam2.configure(config)
         
         print("Iniciando cámara...")
         picam2.start()
         
         # Esperar estabilización
-        time.sleep(2)
+        time.sleep(3)
         
         # Capturar imagen
         print("Capturando imagen...")
@@ -175,10 +202,11 @@ def _take_picture_picamera_legacy(filename):
         with picamera.PiCamera() as camera:
             # Configuración básica
             camera.resolution = (1920, 1080)
-            camera.start_preview()
+            # No usar preview en modo headless
+            # camera.start_preview()
             
             # Esperar estabilización
-            time.sleep(2)
+            time.sleep(3)
             
             # Capturar imagen
             filename.parent.mkdir(parents=True, exist_ok=True)
@@ -249,7 +277,16 @@ def test_camera_fast():
     print(f"Sistema: {system}")
     
     if system == "Linux":
-        # Probar PiCamera2 primero
+        # Probar comandos del sistema primero
+        print("\nProbando comandos del sistema...")
+        temp_file = Path("/tmp/test_camera.jpg")
+        if _take_picture_system_command(temp_file):
+            print("✅ Comandos del sistema funcionan")
+            if temp_file.exists():
+                temp_file.unlink()
+            return True
+        
+        # Probar PiCamera2
         if PICAMERA2_AVAILABLE:
             try:
                 print("\nProbando PiCamera2...")
