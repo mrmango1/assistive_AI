@@ -3,5 +3,6 @@ sounddevice
 opencv-python
 pytesseract
 requests
+python-dotenv
 TTS
 difflib

@@ -1,0 +1,25 @@
+{
+    "read_document": [
+        "leer documento",
+        "quiero que leas",
+        "puedes leer esto",
+        "lee esto",
+        "lee el documento",
+        "leer texto"
+    ],
+    "describe_scene": [
+        "describir escena",
+        "qué ves",
+        "descríbeme el lugar",
+        "describe la imagen",
+        "qué hay aquí",
+        "dime qué ves"
+    ],
+    "exit": [
+        "salir",
+        "terminar",
+        "adiós",
+        "bye",
+        "cerrar"
+    ]
+}

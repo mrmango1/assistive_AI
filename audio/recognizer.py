@@ -11,11 +11,15 @@ class VoskRecognizer:
         self.recognizer = None
         self.stream = None
         self.initialized = False
+        self.listening = False
+        self.paused = False
     
     def _callback(self, indata, frames, time, status):
         if status:
             print("Status:", status)
-        self.q.put(bytes(indata))
+        # Solo procesar audio si no está pausado
+        if not self.paused:
+            self.q.put(bytes(indata))
     
     def initialize(self):
         """Inicializa el modelo Vosk y el reconocedor"""
@@ -44,6 +48,8 @@ class VoskRecognizer:
                 callback=self._callback
             )
             self.stream.start()
+            self.listening = True
+            self.paused = False
             print("Escuchando continuamente con Vosk...")
             return True
         except Exception as e:
@@ -55,10 +61,36 @@ class VoskRecognizer:
         if self.stream:
             self.stream.stop()
             self.stream.close()
+        self.listening = False
+        self.paused = False
+    
+    def pause_listening(self):
+        """Pausa el procesamiento de audio sin detener el stream"""
+        if self.listening:
+            self.paused = True
+            # Limpiar la cola de audio acumulado
+            while not self.q.empty():
+                try:
+                    self.q.get_nowait()
+                except:
+                    break
+            print("🔇 Escucha pausada durante procesamiento...")
+    
+    def resume_listening(self):
+        """Reanuda el procesamiento de audio"""
+        if self.listening:
+            self.paused = False
+            # Limpiar la cola antes de reanudar
+            while not self.q.empty():
+                try:
+                    self.q.get_nowait()
+                except:
+                    break
+            print("🎤 Escucha reanudada...")
     
     def listen_command(self):
         """Escucha un comando de voz"""
-        if not self.initialized or not self.stream:
+        if not self.initialized or not self.stream or self.paused:
             return None
         
         try:
@@ -90,6 +122,14 @@ def start_listening():
 def stop_listening():
     """Detiene la escucha de comandos"""
     recognizer_instance.stop_listening()
+
+def pause_listening():
+    """Pausa la escucha de comandos"""
+    recognizer_instance.pause_listening()
+
+def resume_listening():
+    """Reanuda la escucha de comandos"""
+    recognizer_instance.resume_listening()
 
 def listen_command():
     """Función de compatibilidad para escuchar comandos"""

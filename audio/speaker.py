@@ -3,7 +3,7 @@ import subprocess
 import os
 import requests
 from pathlib import Path
-from config import TTS_OUTPUT_FILE, OPENAI_API_KEY, USE_OPENAI_TTS
+from config import TTS_OUTPUT_FILE, OPENAI_API_KEY, USE_OPENAI_TTS, OPENAI_TTS_VOICE
 
 try:
     from TTS.api import TTS as CoquiTTS
@@ -42,7 +42,7 @@ def _speak_with_openai(text, system):
             "model": "gpt-4o-mini-tts",
             "instructions": "Genera una voz clara y natural para el texto proporcionado en español.",
             "input": text,
-            "voice": "alloy",
+            "voice": OPENAI_TTS_VOICE,
             "response_format": "mp3"
         }
         
@@ -63,7 +63,14 @@ def _speak_with_openai(text, system):
                     subprocess.run(["mpg123", output_file], check=True)
                 except FileNotFoundError:
                     # Fallback a ffplay si mpg123 no está disponible
-                    subprocess.run(["ffplay", "-nodisp", "-autoexit", output_file], check=True)
+                    try:
+                        subprocess.run(["ffplay", "-nodisp", "-autoexit", output_file], check=True)
+                    except FileNotFoundError:
+                        # Último fallback: convertir a wav y usar aplay
+                        wav_file = output_file.replace('.mp3', '.wav')
+                        subprocess.run(["ffmpeg", "-i", output_file, wav_file], check=True)
+                        subprocess.run(["aplay", wav_file], check=True)
+                        os.remove(wav_file)
             else:
                 print(f"[OpenAI-TTS] {text}")
             

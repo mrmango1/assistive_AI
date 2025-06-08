@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from audio.recognizer import initialize_recognizer, start_listening, stop_listening, listen_command
+from audio.recognizer import initialize_recognizer, start_listening, stop_listening, listen_command, pause_listening, resume_listening
 from audio.speaker import speak
 from vision.camera import take_picture
 from vision.ocr import ocr_image
@@ -77,6 +77,9 @@ def handle_command(action):
     filename = None
     try:
         with command_lock:
+            # Pausar la escucha mientras se procesa el comando
+            pause_listening()
+            
             if action == "read_document":
                 speak("Tomando foto del documento...")
                 filename = take_picture()
@@ -148,6 +151,8 @@ def handle_command(action):
         # Siempre limpiar el archivo temporal
         if filename:
             cleanup_temp_file(filename)
+        # Reanudar la escucha al finalizar el comando
+        resume_listening()
 
 def cleanup_temp_files():
     """Limpia todos los archivos temporales al salir"""
