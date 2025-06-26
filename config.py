@@ -30,6 +30,9 @@ TTS_OUTPUT_FILE = TEMP_DIR / "output.wav"
 
 # Configuración de cámara
 DEFAULT_IMAGE_FILENAME = TEMP_DIR / "captured_image.jpg"
+# Rotación de la imagen en grados (0, 90, 180, 270)
+# 0 = sin rotación, 90 = 90° horario, 180 = boca abajo, 270 = 90° antihorario
+CAMERA_ROTATION = int(os.getenv("CAMERA_ROTATION", "0"))
 
 # Configuración de reconocimiento de voz
 SAMPLE_RATE = 16000

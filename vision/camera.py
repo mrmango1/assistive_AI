@@ -9,11 +9,12 @@ from pathlib import Path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from config import DEFAULT_IMAGE_FILENAME
+    from config import DEFAULT_IMAGE_FILENAME, CAMERA_ROTATION
 except ImportError:
     # Fallback si no se puede importar config
     DEFAULT_IMAGE_FILENAME = Path.cwd().parent / "temp" / "captured_image.jpg"
     DEFAULT_IMAGE_FILENAME.parent.mkdir(exist_ok=True)
+    CAMERA_ROTATION = 0
 
 # Importar librerías según disponibilidad
 try:
@@ -35,33 +36,45 @@ try:
 except ImportError:
     PICAMERA_AVAILABLE = False
 
-def take_picture(filename=None):
+def take_picture(filename=None, rotation=None):
     """Toma una foto usando la cámara disponible según el sistema operativo"""
     if filename is None:
         filename = DEFAULT_IMAGE_FILENAME
+    
+    if rotation is None:
+        rotation = CAMERA_ROTATION
     
     filename = Path(filename)
     system = platform.system()
     
     try:
+        result_path = None
+        
         if system == "Linux":  # Raspberry Pi
             # Prioridad: Comandos del sistema > PiCamera2 > PiCamera > OpenCV
             if _take_picture_system_command(filename):
-                return str(filename)
+                result_path = str(filename)
             elif PICAMERA2_AVAILABLE:
                 print("Usando PiCamera2...")
-                return _take_picture_picamera2(filename)
+                result_path = _take_picture_picamera2(filename)
             elif PICAMERA_AVAILABLE:
                 print("Usando PiCamera legacy...")
-                return _take_picture_picamera_legacy(filename)
+                result_path = _take_picture_picamera_legacy(filename)
             elif CV2_AVAILABLE:
                 print("Usando OpenCV con configuración alternativa...")
-                return _take_picture_opencv_alternative(filename)
+                result_path = _take_picture_opencv_alternative(filename)
             else:
                 print("Error: No hay librerías de cámara disponibles")
                 return None
         else:  # macOS, Windows
-            return _take_picture_opencv_fast(filename)
+            result_path = _take_picture_opencv_fast(filename)
+        
+        # Aplicar rotación si es necesario
+        if result_path and rotation != 0:
+            print(f"Aplicando rotación de {rotation}°...")
+            _rotate_image(result_path, rotation)
+        
+        return result_path
             
     except Exception as e:
         print(f"Error tomando foto: {e}")
@@ -266,12 +279,63 @@ def _take_picture_opencv_fast(filename):
     finally:
         cam.release()
 
+def _rotate_image(image_path, rotation_degrees):
+    """Rota una imagen según los grados especificados"""
+    if not CV2_AVAILABLE or rotation_degrees == 0:
+        return
+    
+    try:
+        # Leer la imagen
+        image = cv2.imread(str(image_path))
+        if image is None:
+            print(f"❌ No se pudo leer la imagen para rotación: {image_path}")
+            return
+        
+        # Normalizar el ángulo de rotación
+        rotation_degrees = rotation_degrees % 360
+        
+        if rotation_degrees == 0:
+            return  # No hay necesidad de rotar
+        
+        # Obtener dimensiones de la imagen
+        height, width = image.shape[:2]
+        
+        # Calcular el centro de rotación
+        center = (width // 2, height // 2)
+        
+        # Crear la matriz de rotación
+        rotation_matrix = cv2.getRotationMatrix2D(center, rotation_degrees, 1.0)
+        
+        # Calcular las nuevas dimensiones después de la rotación
+        cos = abs(rotation_matrix[0, 0])
+        sin = abs(rotation_matrix[0, 1])
+        new_width = int((height * sin) + (width * cos))
+        new_height = int((height * cos) + (width * sin))
+        
+        # Ajustar la matriz de rotación para centrar la imagen
+        rotation_matrix[0, 2] += (new_width / 2) - center[0]
+        rotation_matrix[1, 2] += (new_height / 2) - center[1]
+        
+        # Aplicar la rotación
+        rotated_image = cv2.warpAffine(image, rotation_matrix, (new_width, new_height))
+        
+        # Guardar la imagen rotada
+        success = cv2.imwrite(str(image_path), rotated_image)
+        if success:
+            print(f"✅ Imagen rotada {rotation_degrees}° correctamente")
+        else:
+            print(f"❌ Error guardando imagen rotada")
+            
+    except Exception as e:
+        print(f"❌ Error rotando imagen: {e}")
+
 def test_camera_fast():
     """Prueba rápida de cámara"""
     print("=== PRUEBA DE CÁMARAS DISPONIBLES ===")
     print(f"OpenCV disponible: {CV2_AVAILABLE}")
     print(f"PiCamera2 disponible: {PICAMERA2_AVAILABLE}")
     print(f"PiCamera legacy disponible: {PICAMERA_AVAILABLE}")
+    print(f"Rotación configurada: {CAMERA_ROTATION}°")
     
     system = platform.system()
     print(f"Sistema: {system}")
@@ -336,6 +400,15 @@ if __name__ == "__main__":
             if os.path.exists(result):
                 size = os.path.getsize(result)
                 print(f"Tamaño: {size} bytes")
+                
+                # Probar rotación de imagen
+                rotated_result = result.parent / f"rotated_{result.name}"
+                _rotate_image(result, CAMERA_ROTATION)
+                
+                if os.path.exists(result):
+                    print(f"✅ Imagen rotada guardada: {result}")
+                else:
+                    print("❌ La imagen rotada no se encontró")
         else:
             print("❌ Error tomando foto")
     else:
