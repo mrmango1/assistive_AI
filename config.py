@@ -8,14 +8,7 @@ load_dotenv()
 # Configuración de API
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Configuración de idioma
-LANGUAGE = os.getenv("LANGUAGE", "spa")
-
-# Configuración de OCR
-USE_OPENAI_OCR = os.getenv("USE_OPENAI_OCR", "true").lower() == "true"
-
-# Configuración de TTS
-USE_OPENAI_TTS = os.getenv("USE_OPENAI_TTS", "true").lower() == "true"
+# Configuración de TTS (solo OpenAI)
 OPENAI_TTS_VOICE = os.getenv("OPENAI_TTS_VOICE", "alloy")  # Opciones: alloy, echo, fable, onyx, nova, shimmer 
 
 # Configuración de modelos

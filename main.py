@@ -10,9 +10,8 @@ from audio.recognizer import initialize_recognizer, start_listening, stop_listen
 from audio.speaker import speak
 from vision.camera import take_picture
 from vision.ocr import ocr_image
-from vision.describe import describe_image_openai
 from utils.internet import check_internet
-from config import TEMP_DIR, USE_OPENAI_OCR, USE_OPENAI_TTS
+from config import TEMP_DIR, USE_OPENAI_OCR
 
 command_lock = threading.Lock()
 
@@ -50,15 +49,11 @@ def load_commands_from_file(file_path="commands.json"):
         print(f"Error cargando comandos desde {file_path}: {e}")
         print("Usando comandos por defecto...")
     
-    # Comandos por defecto mejorados
+    # Comandos por defecto simplificados para Raspberry Pi
     return {
         "read_document": [
             "leer documento", "quiero que leas", "puedes leer esto",
             "lee esto", "lee el documento", "leer texto"
-        ],
-        "describe_scene": [
-            "describir escena", "qué ves", "descríbeme el lugar",
-            "describe la imagen", "qué hay aquí", "dime qué ves"
         ],
         "exit": ["salir", "terminar", "adiós", "bye", "cerrar"]
     }
@@ -89,22 +84,18 @@ def handle_command(action):
                     return
                 
                 # Verificar conexión solo si se va a usar OpenAI
-                needs_internet = USE_OPENAI_OCR or USE_OPENAI_TTS
-                if needs_internet and not check_internet():
+                if USE_OPENAI_OCR and not check_internet():
                     speak("Sin conexión a internet. Usando procesamiento local.")
                     # Temporalmente cambiar configuraciones si no hay internet
                     import config
                     original_ocr = config.USE_OPENAI_OCR
-                    original_tts = config.USE_OPENAI_TTS
                     
                     config.USE_OPENAI_OCR = False
-                    config.USE_OPENAI_TTS = False
                     
                     try:
                         text = ocr_image(filename)
                     finally:
                         config.USE_OPENAI_OCR = original_ocr
-                        config.USE_OPENAI_TTS = original_tts
                     
                     if text and text.strip():
                         speak(f"El documento dice: {text}")
@@ -122,21 +113,6 @@ def handle_command(action):
                     speak(f"El documento dice: {text}")
                 else:
                     speak("No pude leer texto en el documento.")
-
-            elif action == "describe_scene":
-                speak("Tomando foto de la escena...")
-                filename = take_picture()
-                
-                if not filename:
-                    speak("No pude tomar la foto de la escena.")
-                    return
-                
-                if check_internet():
-                    speak("Analizando escena con inteligencia artificial...")
-                    description = describe_image_openai(filename)
-                    speak(description if description else "No pude describir la escena.")
-                else:
-                    speak("Necesito conexión a internet para describir escenas.")
 
             elif action == "exit":
                 speak("Hasta luego.")
@@ -171,7 +147,7 @@ def main():
         
         # Mostrar configuración actual
         print(f"Configuración - OCR: {'OpenAI' if USE_OPENAI_OCR else 'Tesseract'}")
-        print(f"Configuración - TTS: {'OpenAI' if USE_OPENAI_TTS else 'Sistema/Coqui'}")
+        print(f"Configuración - TTS: OpenAI")
         
         # Cargar comandos
         known_commands = load_commands_from_file()

@@ -1,10 +1,8 @@
-import cv2
-import pytesseract
 import base64
 import requests
-from config import LANGUAGE, OPENAI_API_KEY, USE_OPENAI_OCR
+from config import OPENAI_API_KEY
 
-def ocr_image_openai(image_path):
+def ocr_image(image_path):
     """Extrae texto de una imagen usando la API de OpenAI GPT-4 Vision"""
     if not OPENAI_API_KEY:
         return "Error: No se encontró la clave API de OpenAI."
@@ -61,26 +59,3 @@ def ocr_image_openai(image_path):
     except Exception as e:
         print(f"Error inesperado en ocr_image_openai: {e}")
         return "Error inesperado al extraer texto de la imagen."
-
-def ocr_image_tesseract(filename):
-    """Extrae texto usando pytesseract (método tradicional)"""
-    try:
-        image = cv2.imread(filename)
-        if image is None:
-            return "Error: No se pudo cargar la imagen."
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        text = pytesseract.image_to_string(gray, lang=LANGUAGE)
-        return text.strip()
-    except Exception as e:
-        print(f"Error en OCR con tesseract: {e}")
-        return "Error al extraer texto con tesseract."
-
-def ocr_image(filename):
-    """Función principal de OCR que usa el método configurado"""
-    if USE_OPENAI_OCR:
-        print("Usando OpenAI para OCR...")
-        return ocr_image_openai(filename)
-    else:
-        print("Usando Tesseract para OCR...")
-        return ocr_image_tesseract(filename)

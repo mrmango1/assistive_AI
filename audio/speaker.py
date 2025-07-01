@@ -1,35 +1,23 @@
-import platform
 import subprocess
 import os
 import requests
 from pathlib import Path
-from config import TTS_OUTPUT_FILE, OPENAI_API_KEY, USE_OPENAI_TTS, OPENAI_TTS_VOICE
-
-try:
-    from TTS.api import TTS as CoquiTTS
-    coqui_model = CoquiTTS(model_name="tts_models/es/css10/vits", progress_bar=False, gpu=False)
-    COQUI_AVAILABLE = True
-    print("[INFO] Coqui TTS disponible")
-except ImportError:
-    COQUI_AVAILABLE = False
-    print("[INFO] Coqui TTS no disponible. Usando TTS del sistema.")
+from config import TTS_OUTPUT_FILE, OPENAI_API_KEY, OPENAI_TTS_VOICE
 
 def speak(text):
-    """Convierte texto a voz usando el mejor método disponible"""
+    """Convierte texto a voz usando OpenAI TTS"""
     if not text or not text.strip():
         return
     
     text = text.strip()
-    system = platform.system()
     
-    if USE_OPENAI_TTS and OPENAI_API_KEY:
-        _speak_with_openai(text, system)
-    elif COQUI_AVAILABLE:
-        _speak_with_coqui(text, system)
-    else:
-        _speak_with_system(text, system)
+    if not OPENAI_API_KEY:
+        print(f"[Error] No hay clave API de OpenAI configurada. Texto: {text}")
+        return
+    
+    _speak_with_openai(text)
 
-def _speak_with_openai(text, system):
+def _speak_with_openai(text):
     """Usar OpenAI TTS para generar voz"""
     try:
         url = "https://api.openai.com/v1/audio/speech"
@@ -39,8 +27,7 @@ def _speak_with_openai(text, system):
         }
         
         data = {
-            "model": "gpt-4o-mini-tts",
-            "instructions": "Genera una voz clara y natural para el texto proporcionado en español.",
+            "model": "tts-1",
             "input": text,
             "voice": OPENAI_TTS_VOICE,
             "response_format": "mp3"
@@ -54,25 +41,19 @@ def _speak_with_openai(text, system):
             with open(output_file, 'wb') as f:
                 f.write(response.content)
             
-            # Reproducir el archivo de audio
-            if system == "Darwin":  # macOS
-                subprocess.run(["afplay", output_file], check=True)
-            elif system == "Linux":  # Linux/Raspberry Pi
-                # Usar mpg123 para archivos mp3
+            # Reproducir el archivo de audio en Raspberry Pi
+            try:
+                subprocess.run(["mpg123", output_file], check=True)
+            except FileNotFoundError:
+                # Fallback a ffplay si mpg123 no está disponible
                 try:
-                    subprocess.run(["mpg123", output_file], check=True)
+                    subprocess.run(["ffplay", "-nodisp", "-autoexit", output_file], check=True)
                 except FileNotFoundError:
-                    # Fallback a ffplay si mpg123 no está disponible
-                    try:
-                        subprocess.run(["ffplay", "-nodisp", "-autoexit", output_file], check=True)
-                    except FileNotFoundError:
-                        # Último fallback: convertir a wav y usar aplay
-                        wav_file = output_file.replace('.mp3', '.wav')
-                        subprocess.run(["ffmpeg", "-i", output_file, wav_file], check=True)
-                        subprocess.run(["aplay", wav_file], check=True)
-                        os.remove(wav_file)
-            else:
-                print(f"[OpenAI-TTS] {text}")
+                    # Último fallback: convertir a wav y usar aplay
+                    wav_file = output_file.replace('.mp3', '.wav')
+                    subprocess.run(["ffmpeg", "-i", output_file, wav_file], check=True)
+                    subprocess.run(["aplay", wav_file], check=True)
+                    os.remove(wav_file)
             
             # Limpiar archivo temporal
             try:
@@ -81,64 +62,8 @@ def _speak_with_openai(text, system):
                 pass
         else:
             print(f"[OpenAI-TTS Error] Error {response.status_code}: {response.text}")
-            # Fallback a Coqui o sistema
-            if COQUI_AVAILABLE:
-                _speak_with_coqui(text, system)
-            else:
-                _speak_with_system(text, system)
                 
     except requests.exceptions.RequestException as e:
         print(f"[OpenAI-TTS Error] Error de conexión: {e}")
-        # Fallback a Coqui o sistema
-        if COQUI_AVAILABLE:
-            _speak_with_coqui(text, system)
-        else:
-            _speak_with_system(text, system)
     except Exception as e:
         print(f"[OpenAI-TTS Error] Error inesperado: {e}")
-        # Fallback a Coqui o sistema
-        if COQUI_AVAILABLE:
-            _speak_with_coqui(text, system)
-        else:
-            _speak_with_system(text, system)
-
-def _speak_with_coqui(text, system):
-    """Usar Coqui TTS para generar voz"""
-    try:
-        output_file = str(TTS_OUTPUT_FILE)
-        coqui_model.tts_to_file(text=text, file_path=output_file)
-        
-        if system == "Darwin":  # macOS
-            subprocess.run(["afplay", output_file], check=True)
-        elif system == "Linux":  # Linux/Raspberry Pi
-            subprocess.run(["aplay", output_file], check=True)
-        else:
-            print(f"[Coqui-TTS] {text}")
-            
-        # Limpiar archivo temporal
-        try:
-            os.remove(output_file)
-        except OSError:
-            pass
-            
-    except subprocess.CalledProcessError as e:
-        print(f"[TTS Error] Error reproduciendo audio: {e}")
-        _speak_with_system(text, system)  # Fallback
-    except Exception as e:
-        print(f"[TTS Error] Error con Coqui TTS: {e}")
-        _speak_with_system(text, system)  # Fallback
-
-def _speak_with_system(text, system):
-    """Usar TTS del sistema operativo"""
-    try:
-        if system == "Darwin":  # macOS
-            subprocess.run(["say", text], check=True)
-        elif system == "Linux":  # Linux/Raspberry Pi
-            subprocess.run(["espeak", "-s", "150", text], check=True)
-        else:
-            print(f"[System TTS] {text}")
-    except subprocess.CalledProcessError as e:
-        print(f"[System TTS Error] {e}")
-        print(f"[Fallback] {text}")
-    except FileNotFoundError:
-        print(f"[TTS] Comando de TTS no encontrado. Texto: {text}")
