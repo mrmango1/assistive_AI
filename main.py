@@ -83,36 +83,19 @@ def handle_command(action):
                     speak("No pude tomar la foto del documento.")
                     return
                 
-                # Verificar conexión solo si se va a usar OpenAI
-                if USE_OPENAI_OCR and not check_internet():
-                    speak("Sin conexión a internet. Usando procesamiento local.")
-                    # Temporalmente cambiar configuraciones si no hay internet
-                    import config
-                    original_ocr = config.USE_OPENAI_OCR
-                    
-                    config.USE_OPENAI_OCR = False
-                    
-                    try:
-                        text = ocr_image(filename)
-                    finally:
-                        config.USE_OPENAI_OCR = original_ocr
-                    
-                    if text and text.strip():
-                        speak(f"El documento dice: {text}")
-                    else:
-                        speak("No pude leer texto en el documento.")
-                    return
-                
-                if USE_OPENAI_OCR:
-                    speak("Procesando documento con inteligencia artificial.")
+                # Verificar conexión
+                if not check_internet():
+                    speak("Sin conexión a internet.")
                 else:
-                    speak("Procesando documento sin conexión.")
+                    speak("Procesando documento con inteligencia artificial.")
                 
                 text = ocr_image(filename)
                 if text and text.strip():
                     speak(f"El documento dice: {text}")
                 else:
                     speak("No pude leer texto en el documento.")
+                
+                speak("Comando completado. Puedes dar otro comando o decir 'salir' para terminar.")
 
             elif action == "exit":
                 speak("Hasta luego.")
