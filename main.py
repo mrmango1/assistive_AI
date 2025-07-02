@@ -11,7 +11,7 @@ from audio.speaker import speak
 from vision.camera import take_picture
 from vision.ocr import ocr_image
 from utils.internet import check_internet
-from config import TEMP_DIR, USE_OPENAI_OCR
+from config import TEMP_DIR
 
 command_lock = threading.Lock()
 
@@ -129,7 +129,7 @@ def main():
         print("Iniciando asistente de voz...")
         
         # Mostrar configuración actual
-        print(f"Configuración - OCR: {'OpenAI' if USE_OPENAI_OCR else 'Tesseract'}")
+        print(f"Configuración - OCR: OpenAI")
         print(f"Configuración - TTS: OpenAI")
         
         # Cargar comandos
